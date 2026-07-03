@@ -6,6 +6,46 @@
 // auth.js が失敗時に任意参照（未定義でも動くが no-op を用意）。
 function busyOff() {}
 
+/* ===== モノトーンSVGアイコン（絵文字置換） =====
+   currentColor 線画。サイズ/色は CSS(.ic) と親要素の color/font-size に追従。
+   ・動的HTML内: ic('name') を埋め込む
+   ・静的HTML(index.html)内: <span class="ic" data-ic="name"></span> を置き、boot時 hydrateIcons() で流し込む */
+const ICON = {
+  box:        '<svg viewBox="0 0 24 24"><path d="M21 8 12 3 3 8v8l9 5 9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>',
+  clipboard:  '<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4h6v2.5H9zM8.5 11h7M8.5 15h5"/></svg>',
+  warn:       '<svg viewBox="0 0 24 24"><path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.5M12 17.6h.01"/></svg>',
+  inbox:      '<svg viewBox="0 0 24 24"><path d="M4 14v4.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V14"/><path d="M12 3.5v10M8 9.5l4 4 4-4"/></svg>',
+  refresh:    '<svg viewBox="0 0 24 24"><path d="M20.5 12a8.5 8.5 0 1 1-2.4-6"/><path d="M18 2.5V6h-3.5"/></svg>',
+  reload:     '<svg viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.4-6"/><path d="M6 2.5V6h3.5"/></svg>',
+  check:      '<svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 6.5"/></svg>',
+  checkcircle:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12.2 10.8 15 16 8.8"/></svg>',
+  trash:      '<svg viewBox="0 0 24 24"><path d="M4 7h16M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7M6.5 7l1 12.2a1.5 1.5 0 0 0 1.5 1.4h6a1.5 1.5 0 0 0 1.5-1.4L17.5 7"/></svg>',
+  printer:    '<svg viewBox="0 0 24 24"><path d="M7 9V4h10v5"/><path d="M7 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><rect x="7" y="14" width="10" height="6" rx="1"/></svg>',
+  link:       '<svg viewBox="0 0 24 24"><path d="M9.5 13.5a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1.4 1.4"/><path d="M14.5 10.5a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.4-1.4"/></svg>',
+  hand:       '<svg viewBox="0 0 24 24"><path d="M8 11V6.5a1.5 1.5 0 0 1 3 0V10m0-.5V5a1.5 1.5 0 0 1 3 0v5m0-.5V6.5a1.5 1.5 0 0 1 3 0V13a6 6 0 0 1-6 6h-1.2a5 5 0 0 1-3.9-1.9l-2.2-2.8a1.5 1.5 0 0 1 2.3-1.9L8 13.5"/></svg>',
+  question:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.2a2.5 2.5 0 0 1 4.7 1.1c0 1.7-2.3 2-2.3 3.7M12 16.5h.01"/></svg>',
+  exclaim:    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.2h.01"/></svg>',
+  wrench:     '<svg viewBox="0 0 24 24"><path d="M15.5 8.5a4 4 0 0 1-5-5l2.2 2.2 1.6-1.6L12.1 2A4 4 0 0 1 17 6.9l-1.5 1.6Z"/><path d="m13.5 10.5-8 8a2 2 0 0 1-3-3l8-8"/></svg>',
+  ban:        '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m6 6 12 12"/></svg>',
+  truck:      '<svg viewBox="0 0 24 24"><path d="M3 6h11v9H3zM14 9h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.7"/><circle cx="17.5" cy="18" r="1.7"/></svg>',
+  file:       '<svg viewBox="0 0 24 24"><path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5Z"/><path d="M14 3.5v5h5"/></svg>',
+  gear:       '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4 7l2.6 1.5M17.4 15.5 20 17M4 17l2.6-1.5M17.4 8.5 20 7"/></svg>',
+  user:       '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>',
+  search:     '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m20 20-3.6-3.6"/></svg>',
+  edit:       '<svg viewBox="0 0 24 24"><path d="M4 20h4L18.5 9.5l-4-4L4 16z"/><path d="m13 7 4 4"/></svg>',
+  undo:       '<svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M4 12h10.5a5.5 5.5 0 0 1 0 11H13"/></svg>',
+  mail:       '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg>',
+  x:          '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+// 動的HTML用: アイコン1個ぶんのspanを返す
+function ic(name) { return '<span class="ic">' + (ICON[name] || '') + '</span>'; }
+// 静的HTML(index.html)の <span data-ic="name"> に SVG を流し込む（boot時に1回）
+function hydrateIcons(root) {
+  (root || document).querySelectorAll('[data-ic]').forEach(function (el) {
+    var n = el.getAttribute('data-ic'); if (ICON[n]) el.innerHTML = ICON[n];
+  });
+}
+
 (function forceMobileLayout(){
   function apply(){
     var w = Math.min(
@@ -40,7 +80,7 @@ function __initApp() {
   google.script.run
     .withSuccessHandler(status => {
       if (status.email) {
-        document.getElementById('hdrEmail').textContent = '👤 ' + status.email;
+        document.getElementById('hdrEmail').innerHTML = ic('user') + esc(status.email);
       }
       gIsAdmin = status.isAdmin;
       gIsViewOnly = status.isImporter && !status.isAdmin;
@@ -142,7 +182,7 @@ function render() {
   const list = document.getElementById('clList');
   list.innerHTML = '';  // GAS正常返却後にのみ到達するのでここでクリア
   if (!rows.length) {
-    list.innerHTML = '<div class="empty"><div class="icon">🔍</div><div>条件に一致する件数がありません</div></div>';
+    list.innerHTML = '<div class="empty"><div class="icon">' + ic('search') + '</div><div>条件に一致する件数がありません</div></div>';
   } else {
     rows.forEach(r => list.appendChild(makeItem(r)));
   }
@@ -171,8 +211,8 @@ function makeItem(row) {
   const isNoShip = row.match_status === 'NO_SHIP' || row.match_status === 'TRACKING_NOT_FOUND';
   const inlineBtns = isNoShip ? `
     <div class="cl-inline-btns" onclick="event.stopPropagation()">
-      <button class="btn-jissha" onclick="doMarkJissha('${row.id}',event)">🏃 持参 / 引取に変更</button>
-      <button class="btn-del-row" onclick="doDeleteRow('${row.id}',event)">🗑️ リストから削除</button>
+      <button class="btn-jissha" onclick="doMarkJissha('${row.id}',event)">${ic('hand')}持参 / 引取に変更</button>
+      <button class="btn-del-row" onclick="doDeleteRow('${row.id}',event)">${ic('trash')}リストから削除</button>
     </div>` : '';
 
   // ② 送り状データのみ → 詳細エリアにボタン
@@ -203,7 +243,7 @@ function makeItem(row) {
       </div>
       <div class="cl-dest-wrap" onclick="handleSummaryClick(event,'${row.id}')">
         <div class="cl-dest">${esc(row.dest_display)}</div>
-        <div style="font-size:11px;color:var(--sub);margin-top:2px">${kindBadge(row.kind)} ${statusBadge(row.match_status)}${row.bundled ? ' <span class="tag" style="background:#e9d8fd;color:#553c9a">同梱あり</span>' : ''}${row.checked && row.checker ? ' <span class="tag" style="background:#c6f6d5;color:#276749">✅ ' + esc(row.checker.includes('@') ? row.checker.split('@')[0] : row.checker) + '</span>' : ''}</div>
+        <div style="font-size:11px;color:var(--sub);margin-top:2px">${kindBadge(row.kind)} ${statusBadge(row.match_status)}${row.bundled ? ' <span class="tag" style="background:#e9d8fd;color:#553c9a">同梱あり</span>' : ''}${row.checked && row.checker ? ' <span class="tag" style="background:#c6f6d5;color:#276749">' + ic('check') + esc(row.checker.includes('@') ? row.checker.split('@')[0] : row.checker) + '</span>' : ''}</div>
         ${inlineBtns}
       </div>
       <div class="cl-carrier ${cCls}" onclick="handleSummaryClick(event,'${row.id}')">${esc(row.carrier)}${row.slip_type?'<span style="font-size:10px;font-weight:600;opacity:.8;margin-left:3px">'+esc(slipTypeLabel(row.carrier,row.slip_type))+'</span>':''}${codHtml}</div>
@@ -220,7 +260,7 @@ function makeItem(row) {
       ${items.length ? `<table class="item-table"><thead><tr><th>商品名</th><th style="text-align:right">数量</th></tr></thead><tbody>${itemRows}</tbody></table>` : ''}
       ${needsManualLink && gIsAdmin ? `
       <div class="manual-link" id="mlWrap_${row.id}" data-ml-count="${_mlCount}">
-        <label>${['MATCHED','MANUAL_MATCHED'].includes(row.match_status) ? '🔗 送り状番号を修正' : '送り状番号を手動入力'}</label>
+        <label>${['MATCHED','MANUAL_MATCHED'].includes(row.match_status) ? ic('link')+'送り状番号を修正' : '送り状番号を手動入力'}</label>
         <div id="mlInputsDiv_${row.id}" style="display:flex;flex-direction:column;gap:4px;flex:1">${_mlInputsHtml}</div>
         <button class="btn btn-warn btn-sm" onclick="doManualLink('${row.id}',event)" style="align-self:flex-start">
           <span id="mlBtnTxt_${row.id}">${row.match_status === 'MANUAL_MATCHED' ? '修正する' : '紐付け実行'}</span>
@@ -228,17 +268,17 @@ function makeItem(row) {
       </div>` : ''}
       ${isNoYayoi && gIsAdmin ? `
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-primary btn-sm" onclick="openNoYayoiModal('${row.id}',event)">📋 弥生伝票を紐付け / デモ機・その他</button>
+        <button class="btn btn-primary btn-sm" onclick="openNoYayoiModal('${row.id}',event)">${ic('clipboard')}弥生伝票を紐付け / デモ機・その他</button>
       </div>` : ''}
       ${row.match_status === 'DEMO_OTHER' ? `
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-warn btn-sm" onclick="openDemoEditModal('${row.id}',event)">✏️ デモ機 / その他を修正</button>
+        <button class="btn btn-warn btn-sm" onclick="openDemoEditModal('${row.id}',event)">${ic('edit')}デモ機 / その他を修正</button>
       </div>` : ''}
       <div class="cl-actions" style="margin-top:10px">
-        ${gIsViewOnly ? '' : row.match_status === 'CANCELLED' ? `<span style="color:var(--sub);font-size:12px">🚫 キャンセル済み</span>` : row.checked
-          ? `<button class="btn btn-ghost btn-sm" onclick="doCheck('${row.id}',false,event)">↩ 完了を取り消す</button>`
-          : `<button class="btn btn-success btn-lg" onclick="doCheck('${row.id}',true,event)">✅ この件を完了にする</button>`}
-        ${row.match_status !== 'CANCELLED' && gIsAdmin ? `<button class="btn btn-ghost btn-sm" style="color:var(--sub);border-color:var(--sub);margin-left:auto" onclick="doCancelRow('${row.id}',event)">🚫 キャンセル</button>` : ''}
+        ${gIsViewOnly ? '' : row.match_status === 'CANCELLED' ? `<span style="color:var(--sub);font-size:12px">${ic('ban')}キャンセル済み</span>` : row.checked
+          ? `<button class="btn btn-ghost btn-sm" onclick="doCheck('${row.id}',false,event)">${ic('undo')}完了を取り消す</button>`
+          : `<button class="btn btn-success btn-lg" onclick="doCheck('${row.id}',true,event)">${ic('checkcircle')}この件を完了にする</button>`}
+        ${row.match_status !== 'CANCELLED' && gIsAdmin ? `<button class="btn btn-ghost btn-sm" style="color:var(--sub);border-color:var(--sub);margin-left:auto" onclick="doCancelRow('${row.id}',event)">${ic('ban')}キャンセル</button>` : ''}
       </div>
     </div>`;
   return wrap;
@@ -248,11 +288,11 @@ function makeItem(row) {
 function doMarkJissha(id, event) {
   event.stopPropagation();
   const btn = event.currentTarget;
-  const orig = btn.textContent;
+  const orig = btn.innerHTML;
   btn.disabled = true; btn.textContent = '…';
   google.script.run
     .withSuccessHandler(res => {
-      btn.disabled = false; btn.textContent = orig;
+      btn.disabled = false; btn.innerHTML = orig;
       if (!res.ok) { toast('エラー: '+res.error,'err'); return; }
       const row = allRows.find(r=>r.id===id);
       if (row) { row.match_status='JISSHA'; row.carrier='持参/引取'; row.tracking_no=''; row.count=0; }
@@ -261,7 +301,7 @@ function doMarkJissha(id, event) {
       updateSummary();
       toast('持参/引取に変更しました','ok');
     })
-    .withFailureHandler(err=>{ btn.disabled=false; btn.textContent=orig; toast(err.message,'err'); })
+    .withFailureHandler(err=>{ btn.disabled=false; btn.innerHTML=orig; toast(err.message,'err'); })
     .markAsJissha(id);
 }
 
@@ -273,13 +313,13 @@ function doDeleteRow(id, event) {
   btn.disabled = true; btn.textContent = '…';
   google.script.run
     .withSuccessHandler(res => {
-      if (!res.ok) { btn.disabled=false; btn.textContent='🗑️ リストから削除'; toast('エラー: '+res.error,'err'); return; }
+      if (!res.ok) { btn.disabled=false; btn.innerHTML=ic('trash')+'リストから削除'; toast('エラー: '+res.error,'err'); return; }
       allRows = allRows.filter(r=>r.id!==id);
       document.querySelector(`.cl-item[data-id="${id}"]`)?.remove();
       updateSummary();
       toast('削除しました','info');
     })
-    .withFailureHandler(err=>{ btn.disabled=false; btn.textContent='🗑️ リストから削除'; toast(err.message,'err'); })
+    .withFailureHandler(err=>{ btn.disabled=false; btn.innerHTML=ic('trash')+'リストから削除'; toast(err.message,'err'); })
     .deleteRowFromList(id);
 }
 
@@ -374,7 +414,7 @@ function submitNoYayoi() {
         loadEl.style.display='none'; actEl.style.display='flex';
         closeModal('modalNoYayoi');
         if (!res.ok) { toast('エラー: '+res.error,'err'); return; }
-        toast('✅ 伝票を紐付けました','ok');
+        toast('伝票を紐付けました','ok');
         // ローカル更新
         const row = allRows.find(r=>r.id===id);
         if (row) {
@@ -402,7 +442,7 @@ function submitNoYayoi() {
         loadEl.style.display='none'; actEl.style.display='flex';
         closeModal('modalNoYayoi');
         if (!res.ok) { toast('エラー: '+res.error,'err'); return; }
-        toast('✅ デモ機/その他として登録しました','ok');
+        toast('デモ機/その他として登録しました','ok');
         const row = allRows.find(r=>r.id===id);
         if (row) { row.match_status='DEMO_OTHER'; row.kind='DEMO'; row.client_name=''; row.staff_name=req; row.items_text=desc; row.qty_text='-'; }
         const el = document.querySelector(`.cl-item[data-id="${id}"]`);
@@ -436,7 +476,7 @@ function doManualLink(id, event) {
     .withSuccessHandler(res => {
       btn.disabled = false; txtEl.textContent = '紐付け実行';
       if (!res.ok) { toast('エラー: ' + res.error, 'err'); return; }
-      toast(`✅ 紐付け完了 ${res.carrier ? '(' + res.carrier + ')' : ''}`, 'ok');
+      toast(`紐付け完了 ${res.carrier ? '(' + res.carrier + ')' : ''}`, 'ok');
       // ローカルデータ更新して再描画
       const row = allRows.find(r => r.id === id);
       if (row) {
@@ -517,10 +557,10 @@ function makeSkipItem(row) {
       <div class="skip-actions">
         <input type="text" class="skip-inp" id="skipInp_${row.id}" placeholder="送り状番号を入力して紐付け…">
         <button class="btn btn-warn btn-sm" onclick="resolveSkip('${row.id}','ADD_TO_LIST',event)">
-          <span id="skipBtnAdd_${row.id}">📋 リストに追加</span>
+          <span id="skipBtnAdd_${row.id}">${ic('clipboard')}リストに追加</span>
         </button>
         <button class="btn btn-ghost btn-sm" style="color:var(--sub);border-color:var(--sub)" onclick="resolveSkip('${row.id}','EXCLUDE',event)">
-          <span id="skipBtnExc_${row.id}">✕ リストに追加しない</span>
+          <span id="skipBtnExc_${row.id}">${ic('x')}リストに追加しない</span>
         </button>
       </div>`}
     </div>`;
@@ -548,14 +588,14 @@ function resolveSkip(id, action, event) {
   const btnId = action === 'ADD_TO_LIST' ? 'skipBtnAdd_' + id : 'skipBtnExc_' + id;
   const btnEl = document.getElementById(btnId);
   const triggerBtn = event.currentTarget;
-  const origTxt = btnEl.textContent;
+  const origTxt = btnEl.innerHTML;
   btnEl.innerHTML = '<div class="spin" style="width:14px;height:14px;border-width:2px;display:inline-block"></div>';
   triggerBtn.disabled = true;
 
   google.script.run
     .withSuccessHandler(res => {
       triggerBtn.disabled = false;
-      btnEl.textContent = origTxt;
+      btnEl.innerHTML = origTxt;
       if (!res.ok) { toast('エラー: ' + res.error, 'err'); return; }
       if (action === 'EXCLUDE') {
         toast('除外しました', 'info');
@@ -564,7 +604,7 @@ function resolveSkip(id, action, event) {
         const el = document.querySelector(`.skip-item[data-id="${id}"]`);
         if (el) { const newEl = makeSkipItem(row); el.replaceWith(newEl); }
       } else {
-        toast(`✅ チェックリストに追加しました ${res.carrier ? '(' + res.carrier + ')' : ''}`, 'ok');
+        toast(`チェックリストに追加しました ${res.carrier ? '(' + res.carrier + ')' : ''}`, 'ok');
         skipRows = skipRows.filter(r => r.id !== id);
         renderSkip();
         // バッジ更新
@@ -575,7 +615,7 @@ function resolveSkip(id, action, event) {
       }
     })
     .withFailureHandler(err => {
-      triggerBtn.disabled = false; btnEl.textContent = origTxt;
+      triggerBtn.disabled = false; btnEl.innerHTML = origTxt;
       toast(err.message, 'err');
     })
     .resolveSkipCandidate(id, action, trackingNo);
@@ -596,7 +636,7 @@ function doCancelRow(id, event) {
       const el = document.querySelector('.cl-item[data-id="' + id + '"]');
       if (el && row) { try { const n = makeItem(row); n.classList.add('open'); el.replaceWith(n); } catch(e) {} }
       updateSummary();
-      toast('🚫 キャンセルしました', 'info');
+      toast('キャンセルしました', 'info');
     })
     .withFailureHandler(err => { btn.disabled = false; btn.innerHTML = orig; toast(err.message, 'err'); })
     .markAsCancelled(id);
@@ -643,7 +683,7 @@ function skipBulkExclude() {
   btn.disabled = true; btn.textContent = '処理中…';
   google.script.run
     .withSuccessHandler(res => {
-      btn.textContent = '✕ 選択をリストに追加しない';
+      btn.innerHTML = ic('x') + '選択をリストに追加しない';
       if (!res.ok) { toast('エラー: ' + res.error, 'err'); btn.disabled = false; return; }
       toast(`${res.count}件を除外しました`, 'info');
       ids.forEach(id => {
@@ -658,7 +698,7 @@ function skipBulkExclude() {
       badge.style.display = active > 0 ? '' : 'none';
       badge.textContent = active;
     })
-    .withFailureHandler(err => { btn.disabled = false; btn.textContent = '✕ 選択をリストに追加しない'; toast(err.message, 'err'); })
+    .withFailureHandler(err => { btn.disabled = false; btn.innerHTML = ic('x') + '選択をリストに追加しない'; toast(err.message, 'err'); })
     .bulkExcludeSkip(ids);
 }
 
@@ -758,7 +798,7 @@ function closeBundledModal(withSiblings) {
           if (_bundledBtn) { _bundledBtn.disabled = false; _bundledBtn.innerHTML = _bundledBtnOrig; }
           updateSummary();
           const who = lastChecker ? ` (${lastChecker})` : '';
-          toast(withSiblings ? `✅ ${idsToComplete.length}件まとめて完了${who}` : `✅ 完了${who}`, 'ok');
+          toast(withSiblings ? `${idsToComplete.length}件まとめて完了${who}` : `完了${who}`, 'ok');
           _bundledTargetId = null; _bundledSiblings = []; _bundledBtn = null;
         }
       })
@@ -784,7 +824,7 @@ function execDoCheck(id, checked, btn, origHTML) {
       // スプシのチェック状態を取得して画面に差分反映
       refreshCheckStatus();
       const who = res.checker ? ` (${res.checker})` : '';
-      toast(checked ? `✅ 完了${who}` : '↩ 取り消しました', checked ? 'ok' : 'info');
+      toast(checked ? `完了${who}` : '取り消しました', checked ? 'ok' : 'info');
     })
     .withFailureHandler(err => { btn.disabled=false; btn.innerHTML=origHTML; toast(err.message,'err'); })
     .updateCheckStatus(id, checked, '');
@@ -895,7 +935,7 @@ function enterDelMode() {
   document.body.classList.add('del-mode');
   document.getElementById('delBar').classList.add('show');
   document.getElementById('filterBar').style.display='none';
-  document.getElementById('btnDelMode').textContent='✕ 削除モード終了';
+  document.getElementById('btnDelMode').innerHTML=ic('x')+'削除モード終了';
   // btnPrintが常に右端、削除モードボタンはその左に自然に並ぶ
   document.querySelectorAll('.cl-item.open').forEach(i=>i.classList.remove('open'));
   updateDelBar();
@@ -905,7 +945,7 @@ function exitDelMode() {
   document.body.classList.remove('del-mode');
   document.getElementById('delBar').classList.remove('show');
   document.getElementById('filterBar').style.display='';
-  document.getElementById('btnDelMode').textContent='🗑️ 削除モード';
+  document.getElementById('btnDelMode').innerHTML=ic('trash')+'削除モード';
   // btnPrintは常にmargin-left:autoで右端固定
   document.querySelectorAll('.del-chk').forEach(c=>c.checked=false);
   document.querySelectorAll('.cl-item.del-selected').forEach(el=>el.classList.remove('del-selected'));
@@ -1016,11 +1056,11 @@ function doImport() {
         .withSuccessHandler(function(res){
           setLoading('import', false);
           if (!res.ok) { toast('エラー: '+res.error,'err'); return; }
-          var msg = '✅ インポート完了<br>弥生: '+res.yayoi_count+'件 ／ ヤマト: '+res.yamato_count+'件 ／ 佐川: '+res.sagawa_count+'件<br>新規追加: <strong>'+res.added+'件</strong>　スキップ: '+res.skipped+'件';
-          if (res.updated > 0) msg += '<br><span style="color:var(--warn)">⚠️ 内容更新・完了取消: <strong>'+res.updated+'件</strong></span>';
-          if (res.skip_added > 0) msg += '<br>⚠️ スルー候補: <strong>'+res.skip_added+'件</strong>（スルー候補タブで処理してください）';
-          if (res.skip_purged > 0) msg += '<br><span style="color:#48bb78">✅ スルー候補から突合済み削除: <strong>'+res.skip_purged+'件</strong></span>';
-          if (res.noyayoi_deleted > 0) msg += '<br><span style="color:var(--sub)">🗑️ 弥生伝票なし（未処理）自動削除: <strong>'+res.noyayoi_deleted+'件</strong></span>';
+          var msg = ic('checkcircle')+'インポート完了<br>弥生: '+res.yayoi_count+'件 ／ ヤマト: '+res.yamato_count+'件 ／ 佐川: '+res.sagawa_count+'件<br>新規追加: <strong>'+res.added+'件</strong>　スキップ: '+res.skipped+'件';
+          if (res.updated > 0) msg += '<br><span style="color:var(--warn)">'+ic('warn')+'内容更新・完了取消: <strong>'+res.updated+'件</strong></span>';
+          if (res.skip_added > 0) msg += '<br>'+ic('warn')+'スルー候補: <strong>'+res.skip_added+'件</strong>（スルー候補タブで処理してください）';
+          if (res.skip_purged > 0) msg += '<br><span style="color:#48bb78">'+ic('check')+'スルー候補から突合済み削除: <strong>'+res.skip_purged+'件</strong></span>';
+          if (res.noyayoi_deleted > 0) msg += '<br><span style="color:var(--sub)">'+ic('trash')+'弥生伝票なし（未処理）自動削除: <strong>'+res.noyayoi_deleted+'件</strong></span>';
           document.getElementById('importResult').innerHTML = msg;
           document.getElementById('importResult').style.display = 'block';
           toast('インポート完了', 'ok');
@@ -1105,18 +1145,18 @@ function onFile(input,type) {
       const fnEl=document.getElementById('fn'+cap(type));
       if(bad>=2){
         fileWarnings[type]=true;
-        fnEl.innerHTML='⚠️ '+f.name+'<br><span style="color:var(--danger);font-size:11px">送り状番号末尾が000になっています。Excelで開いて保存した可能性があります。メモ帳等で開き直してください。</span>';
+        fnEl.innerHTML=ic('warn')+esc(f.name)+'<br><span style="color:var(--danger);font-size:11px">送り状番号末尾が000になっています。Excelで開いて保存した可能性があります。メモ帳等で開き直してください。</span>';
         input.closest('.file-zone').style.borderColor='var(--danger)';
       } else {
         fileWarnings[type]=false;
-        fnEl.textContent='✓ '+f.name;
+        fnEl.innerHTML=ic('check')+esc(f.name);
         input.closest('.file-zone').style.borderColor='var(--success)';
       }
     };
     reader.readAsText(f,type==='yamato'?'Shift_JIS':'UTF-8');
     return;
   }
-  document.getElementById('fn'+cap(type)).textContent='✓ '+f.name;
+  document.getElementById('fn'+cap(type)).innerHTML=ic('check')+esc(f.name);
   input.closest('.file-zone').style.borderColor='var(--success)';
 }
 function onDrop(e,type) {
@@ -1169,17 +1209,17 @@ function kindBadge(k) {
 }
 function statusBadge(s) {
   const m={
-    MATCHED:          ['✓ 突合OK','st-ok'],
-    MANUAL_MATCHED:   ['🔗 手動紐付け','st-manual'],
-    JISSHA:           ['🏃 持参/引取','st-jissha'],
-    NO_SHIP:          ['⚠️ 発送データなし','st-noship'],
-    NO_YAYOI:         ['❓ 弥生伝票なし','st-noyayoi'],
-    TRACKING_NOT_FOUND:['❗ 送り状番号未発見','st-notfound'],
-    DEMO_OTHER:       ['🔧 デモ機/その他','st-manual'],
-    CANCELLED:        ['🚫 キャンセル','st-unmatched'],
+    MATCHED:          ['突合OK','st-ok','check'],
+    MANUAL_MATCHED:   ['手動紐付け','st-manual','link'],
+    JISSHA:           ['持参/引取','st-jissha','hand'],
+    NO_SHIP:          ['発送データなし','st-noship','warn'],
+    NO_YAYOI:         ['弥生伝票なし','st-noyayoi','question'],
+    TRACKING_NOT_FOUND:['送り状番号未発見','st-notfound','exclaim'],
+    DEMO_OTHER:       ['デモ機/その他','st-manual','wrench'],
+    CANCELLED:        ['キャンセル','st-unmatched','ban'],
   };
-  const [lbl,cls]=m[s]||['⚠️ 要確認','st-unmatched'];
-  return `<span class="stbadge ${cls}">${lbl}</span>`;
+  const [lbl,cls,icn]=m[s]||['要確認','st-unmatched','warn'];
+  return `<span class="stbadge ${cls}">${ic(icn)}${lbl}</span>`;
 }
 
 // ===== 起動入口（auth.js がログイン成功後に呼ぶ） =====
@@ -1188,5 +1228,6 @@ function boot() {
   var a = document.getElementById('app');     if (a) a.style.display = '';
   if (window.__deliverInited) return;   // トークン自動更新等での多重初期化を防止
   window.__deliverInited = true;
+  hydrateIcons();   // 静的HTML(index.html)の data-ic 属性にSVGを流し込む
   __initApp();   // 旧 DOMContentLoaded 初期化（日付一覧・権限取得・描画）
 }

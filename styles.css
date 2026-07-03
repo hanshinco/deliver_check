@@ -856,3 +856,11 @@ html.force-mobile #summaryWrap > div[style*="grid-template-columns:1fr 1fr"] str
   .hdr .btn,.tabs,.filter-bar,.del-bar,.cl-actions,.cl-chevron{display:none!important}
   .cl-detail{display:block!important}
 }
+
+/* ===================================================================
+   モノトーンSVGアイコン（絵文字置換）: .ic は親の color/font-size に追従
+   =================================================================== */
+.ic{display:inline-flex;align-items:center;justify-content:center;width:1.1em;height:1.1em;vertical-align:-0.16em;margin-inline-end:.3em;flex:none}
+.ic svg{width:100%;height:100%;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.btn .ic{margin-inline-end:0}            /* .btn は flex gap を持つため二重余白を回避 */
+.empty .icon .ic{margin-inline-end:0;width:1em;height:1em}
