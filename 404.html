@@ -7,7 +7,7 @@
 <script>(function(){var b=location.hostname.indexOf('github.io')>=0?'/'+(location.pathname.split('/')[1]||'')+'/':'/';window.__BASE=b;document.write('<base href="'+b+'">');})();</script>
 <title>出荷チェック</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<meta name="theme-color" content="#1f2430">
+<meta name="theme-color" content="#1a365d">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -27,8 +27,277 @@
 
 <div class="loading" id="loading" style="display:none">読み込み中…</div>
 
-<!-- アプリ本体（ログイン後に表示）。現行UIをここに移植 -->
-<div id="app" style="display:none"></div>
+<!-- アプリ本体（ログイン後に表示）。現行UIを移植 -->
+<div id="app" style="display:none">
+<div class="hdr">
+  <div class="hdr-title">📦出荷チェックリスト</div>
+  <div class="hdr-date" id="hdrDate"></div>
+  <div style="font-size:11px;opacity:.7;white-space:nowrap" id="hdrEmail"></div>
+</div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ② NO_YAYOI修正モーダル -->
+<div class="modal-bg" id="modalNoYayoi">
+  <div class="modal modal-wide">
+    <div class="modal-title">📦 送り状データの処理</div>
+    <p style="font-size:12px;color:var(--sub);margin-bottom:4px" id="noYayoiDesc"></p>
+
+    <div class="tab2-bar">
+      <button class="tab2-btn active" onclick="switchModal2Tab('slip',this)">📋 弥生伝票を紐付け</button>
+      <button class="tab2-btn" onclick="switchModal2Tab('demo',this)">🔧 デモ機 / その他</button>
+    </div>
+
+    <!-- 伝票紐付けタブ -->
+    <div id="modal2-slip" class="tab2-pane active">
+      <p style="font-size:12px;color:var(--sub);margin-bottom:8px">スルー候補の伝票番号を選択して紐付けます。</p>
+      <div class="inp-item">
+        <label>伝票番号を選択</label>
+        <select id="slipSelectDD" class="select-slip">
+          <option value="">読み込み中…</option>
+        </select>
+      </div>
+      <div id="slipPreview" style="display:none;margin-top:10px;padding:10px;background:#f7fafc;border-radius:6px;font-size:12px;line-height:1.7"></div>
+    </div>
+
+    <!-- デモ機/その他タブ -->
+    <div id="modal2-demo" class="tab2-pane">
+      <div class="inp-grid">
+        <div class="inp-item">
+          <label>依頼先（社内）</label>
+          <input type="text" id="demoRequester" placeholder="例：小林 賢輔">
+        </div>
+        <div class="inp-item">
+          <label>内容（何を）</label>
+          <textarea id="demoDescription" placeholder="例：ピンシーカープロXM デモ機 貸出"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div id="noYayoiLoading" class="modal-loading"><div class="spin"></div><span id="noYayoiLoadingMsg">処理中…</span></div>
+    <div class="modal-actions" id="noYayoiActions">
+      <button class="btn btn-ghost" onclick="closeModal('modalNoYayoi')">キャンセル</button>
+      <button class="btn btn-primary" onclick="submitNoYayoi()">完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 同梱確認モーダル -->
+<div class="modal-bg" id="modalBundled">
+  <div class="modal">
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>📦 同梱あり — 一緒に完了しますか？</span>
+      <button onclick="cancelBundledModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--sub);line-height:1;padding:0 2px" title="キャンセル">×</button>
+    </div>
+    <p style="color:#4a5568;line-height:1.6;font-size:13px">同じ送り状番号の伝票が他にもあります。<br>まとめて完了にしますか？</p>
+    <div id="bundledList" style="margin:12px 0;display:flex;flex-direction:column;gap:6px"></div>
+    <div id="bundledLoading" class="modal-loading"><div class="spin"></div><span>処理中…</span></div>
+    <div class="modal-actions" id="bundledActions">
+      <button class="btn btn-ghost" onclick="closeBundledModal(false)">この件だけ完了</button>
+      <button class="btn btn-success" onclick="closeBundledModal(true)">✅ まとめて完了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 未完了警告モーダル（本日完了ボタン押下時のサーバー側二重チェック） -->
+<div class="modal-bg" id="modalIncompleteWarn">
+  <div class="modal">
+    <div class="modal-title">⚠️ 未完了のレコードがあります</div>
+    <p style="color:#4a5568;line-height:1.6;font-size:13px">未完了のレコードがあります。<br>ブラウザを更新して確認してください。</p>
+    <div id="incompleteWarnLoading" class="modal-loading"><div class="spin"></div><span>確認中…</span></div>
+    <div class="modal-actions" id="incompleteWarnActions">
+      <button class="btn btn-ghost" onclick="closeModal('modalIncompleteWarn')">閉じる</button>
+      <button class="btn btn-primary" onclick="location.reload()">更新</button>
+    </div>
+  </div>
+</div>
+
+<!-- 完了モーダル -->
+<div class="modal-bg" id="modalCompletion">
+  <div class="modal">
+    <div class="modal-title">✅ 本日の作業完了</div>
+    <p style="color:#4a5568;line-height:1.6;font-size:13px">全件チェック完了です。<br>報告メールを <strong>sales@hanshinco.com</strong> に送信します。</p>
+    <div style="margin-top:12px">
+      <label style="font-size:11px;color:var(--sub);font-weight:600">完了者名</label>
+      <input id="inpChecker" class="modal-inp" type="text" placeholder="例：上田 夏穂">
+    </div>
+    <div id="completionLoading" class="modal-loading"><div class="spin"></div><span>メール送信中…</span></div>
+    <div class="modal-actions" id="completionActions">
+      <button class="btn btn-ghost" onclick="closeModal('modalCompletion')">キャンセル</button>
+      <button class="btn btn-success" onclick="sendCompletion()">📧 送信する</button>
+    </div>
+  </div>
+</div>
+
+<!-- 削除モーダル -->
+<div class="modal-bg" id="modalDeleteSelected">
+  <div class="modal">
+    <div class="modal-title">🗑️ 選択した件を削除</div>
+    <p id="delSelDesc" style="color:#4a5568;line-height:1.6;font-size:13px"></p>
+    <div style="margin-top:12px">
+      <label style="font-size:11px;color:var(--sub);font-weight:600">管理者メールアドレス</label>
+      <input id="inpAdminSel" class="modal-inp" type="email" placeholder="自分のメールアドレスを入力">
+    </div>
+    <div id="delLoading" class="modal-loading"><div class="spin"></div><span>削除中…しばらくお待ちください</span></div>
+    <div class="modal-actions" id="delModalActions">
+      <button class="btn btn-ghost" onclick="closeModal('modalDeleteSelected')">キャンセル</button>
+      <button class="btn btn-danger" id="btnDelExecModal" onclick="execDeleteSelected()">削除実行</button>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('list',this)">📋 チェックリスト</button>
+    <button class="tab-btn" id="tabBtnSkip" onclick="switchTab('skip',this)" style="display:none">⚠️ スルー候補<span class="skip-count-badge" id="skipBadge" style="display:none">0</span></button>
+    <button class="tab-btn" id="tabBtnImport" onclick="switchTab('import',this)" style="display:none">📥 インポート</button>
+  </div>
+
+  <!-- ===== チェックリスト ===== -->
+  <div id="tab-list" class="tab-pane active">
+    <div class="card">
+      <div class="form-row" style="margin-bottom:10px">
+        <div class="fg">
+          <label>日付</label>
+          <select id="dateSelect" onchange="loadChecklist()">
+            <option value="">-- 選択 --</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" id="btnRefresh" onclick="refreshCheckStatus()">🔄 チェック更新</button>
+        <button class="btn btn-ghost" id="btnReload" onclick="loadChecklist()" title="リストを全件再取得">↺ 全件再取得</button>
+        <button class="btn btn-success" id="btnComplete" onclick="checkBeforeComplete()" disabled>✅ 本日完了</button>
+        <button class="btn btn-ghost-d" id="btnDelMode" onclick="toggleDelMode()" style="display:none">🗑️ 削除モード</button>
+        <button class="btn btn-ghost" onclick="window.print()" id="btnPrint" style="margin-left:auto">🖨️</button>
+      </div>
+      <div id="summaryWrap" style="display:none">
+        <div class="sum-grid">
+          <div class="sum-item"><div class="sum-n" id="sTotal">0</div><div class="sum-l">総口数</div></div>
+          <div class="sum-item"><div class="sum-n" id="sDone" style="color:var(--success)">0</div><div class="sum-l">完了口数</div></div>
+          <!-- <div class="sum-item"><div class="sum-n" id="sSales">0</div><div class="sum-l">弥生</div></div> -->
+          <!-- <div class="sum-item"><div class="sum-n" id="sDemo" style="color:var(--warn)">0</div><div class="sum-l">デモ機/その他</div></div> -->
+          <!-- <div class="sum-item"><div class="sum-n" id="sWarn" style="color:var(--danger)">0</div><div class="sum-l">要確認</div></div> -->
+          <div id="sSales" style="display:none"></div>
+          <div id="sDemo" style="display:none"></div>
+          <div id="sWarn" style="display:none"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div style="background:var(--bg);border-radius:var(--r);padding:10px;border:1px solid var(--border);font-size:12px">
+            <div style="font-weight:700;color:var(--danger);margin-bottom:4px">🚚 ヤマト</div>
+            <div style="display:none">件数(弥生伝票数): <strong id="sYamatoCount">0</strong>件</div>
+            <div>個口(箱数): <strong id="sYamatoBox">0</strong>口</div>
+          </div>
+          <div style="background:var(--bg);border-radius:var(--r);padding:10px;border:1px solid var(--border);font-size:12px">
+            <div style="font-weight:700;color:var(--success);margin-bottom:4px">🚚 佐川</div>
+            <div style="display:none">件数(弥生伝票数): <strong id="sSagawaCount">0</strong>件</div>
+            <div>個口(箱数): <strong id="sSagawaBox">0</strong>口</div>
+          </div>
+        </div>
+        <div class="prog-wrap">
+          <div class="prog-meta"><span>進捗</span><span id="progText">0 / 0</span></div>
+          <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-bar" id="filterBar" style="display:none">
+      <button class="fil active" onclick="setFilter('ALL',this)">すべて</button>
+      <button class="fil" onclick="setFilter('SALES',this)">弥生</button>
+      <button class="fil" onclick="setFilter('DEMO',this)">デモ機/その他</button>
+      <button class="fil" onclick="setFilter('JISSHA',this)">持参/引取</button>
+      <button class="fil" onclick="setFilter('WARN',this)">⚠️ 要確認</button>
+      <button class="fil" onclick="setFilter('UNDONE',this)">未完了</button>
+    </div>
+
+    <div class="del-bar" id="delBar">
+      <div class="del-bar-label">🗑️ 削除モード｜<span id="delCount">0</span>件選択中</div>
+      <button class="btn btn-ghost btn-sm" onclick="selectAllVisible()">すべて選択</button>
+      <button class="btn btn-ghost btn-sm" onclick="deselectAll()">選択解除</button>
+      <button class="btn btn-danger btn-sm" id="btnDelExec" onclick="confirmDeleteSelected()" disabled>選択した件を削除</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleDelMode()">キャンセル</button>
+    </div>
+
+    <div class="cl-list" id="clList"></div>
+    <div class="loading" id="listLoading" style="margin-top:20px"><div class="spin"></div><span>読み込み中…</span></div>
+    <div class="empty" id="emptyMsg"><div class="icon">📋</div><div>日付を選択してデータを読み込んでください</div></div>
+  </div>
+
+  <!-- ===== スルー候補 ===== -->
+  <div id="tab-skip" class="tab-pane">
+    <div class="card" style="background:#fffbeb;border:1px solid #f6e05e">
+      <div style="font-weight:700;font-size:14px;margin-bottom:6px">⚠️ スルー候補とは</div>
+      <p style="font-size:12px;color:#744210;line-height:1.7">
+        弥生に伝票はあるが、送り状番号も持参/引取の記載もない伝票です。<br>
+        <strong>送り状番号を手入力して紐付け</strong>するか、<strong>「リストに追加しない」</strong>で除外できます。<br>
+        ※ 新商品大量発注など、後で送り状番号が確定する場合はここで一括処理できます。
+      </p>
+    </div>
+
+    <div class="form-row" style="margin-bottom:12px">
+      <div class="fg">
+        <label>日付</label>
+        <select id="skipDateSelect" onchange="loadSkipCandidates()">
+          <option value="">-- 選択 --</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="loadSkipCandidates()">🔄 読込</button>
+    </div>
+
+    <div id="skipBulkBar" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:#fffbeb;border:1px solid #f6e05e;border-radius:var(--r);margin-bottom:10px;flex-wrap:wrap">
+      <div style="font-weight:700;color:var(--warn);flex:1">⚠️ 一括操作｜<span id="skipSelCount">0</span>件選択中</div>
+      <button class="btn btn-ghost btn-sm" onclick="skipSelectAll()">すべて選択</button>
+      <button class="btn btn-ghost btn-sm" onclick="skipDeselectAll()">選択解除</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--sub);border-color:var(--sub)" onclick="skipBulkExclude()" id="btnSkipBulkExclude" disabled>✕ 選択をリストに追加しない</button>
+    </div>
+    <div id="skipList"></div>
+    <div class="loading" id="skipLoading" style="margin-top:20px"><div class="spin"></div><span>読み込み中…</span></div>
+    <div class="empty" id="skipEmpty"><div class="icon">✅</div><div>スルー候補はありません</div></div>
+  </div>
+
+  <!-- ===== インポート ===== -->
+  <div id="tab-import" class="tab-pane">
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="font-weight:700;font-size:14px">📥 ファイルインポート</div>
+        <button class="btn btn-ghost btn-sm" onclick="resetImport()">🔄 リセット</button>
+      </div>
+      <p style="color:var(--sub);font-size:12px;margin-bottom:16px">同じ伝票番号・送り状番号は重複登録されません。1日に複数回インポート可能です。</p>
+      <div style="display:grid;gap:12px">
+        <div>
+          <div style="font-weight:700;font-size:12px;margin-bottom:6px">① 弥生販売 xlsx <span style="color:#c53030">*</span></div>
+          <div class="file-zone" onclick="document.getElementById('fYayoi').click()"
+            ondrop="onDrop(event,'yayoi')" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
+            <input type="file" id="fYayoi" accept=".xlsx,.xls" onchange="onFile(this,'yayoi')">
+            📄 クリックまたはドラッグ＆ドロップ
+            <div class="file-name" id="fnYayoi"></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:12px;margin-bottom:6px">② ヤマト CSV <span style="color:#c53030">*</span></div>
+          <div class="file-zone" onclick="document.getElementById('fYamato').click()"
+            ondrop="onDrop(event,'yamato')" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
+            <input type="file" id="fYamato" accept=".csv" onchange="onFile(this,'yamato')">
+            📄 クリックまたはドラッグ＆ドロップ
+            <div class="file-name" id="fnYamato"></div>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:12px;margin-bottom:6px">③ 佐川 CSV <span style="color:#c53030">*</span></div>
+          <div class="file-zone" onclick="document.getElementById('fSagawa').click()"
+            ondrop="onDrop(event,'sagawa')" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')">
+            <input type="file" id="fSagawa" accept=".csv" onchange="onFile(this,'sagawa')">
+            📄 クリックまたはドラッグ＆ドロップ
+            <div class="file-name" id="fnSagawa"></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;align-items:center">
+        <button class="btn btn-primary" id="btnImport" onclick="doImport()">⚙️ インポート実行</button>
+        <div class="loading" id="importLoading"><div class="spin"></div><span id="importMsg">処理中…</span></div>
+      </div>
+      <div id="importResult" style="display:none;margin-top:14px;padding:14px;background:#f0fff4;border:1px solid #9ae6b4;border-radius:var(--r);font-size:13px;line-height:1.9"></div>
+    </div>
+  </div>
+</div>
+</div>
 
 <script src="config.js"></script>
 <script src="app-core.js"></script>
